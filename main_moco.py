@@ -29,10 +29,12 @@ import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import torchvision.models as torchvision_models
 from torch.utils.tensorboard import SummaryWriter
+from datasets import load_dataset
 
 import moco.builder
 import moco.loader
 import moco.optimizer
+from hfds_loader import HFTwoCropsDataset
 
 import vits
 
@@ -116,6 +118,10 @@ parser.add_argument('--warmup-epochs', default=10, type=int, metavar='N',
                     help='number of warmup epochs')
 parser.add_argument('--crop-min', default=0.08, type=float,
                     help='minimum scale for random cropping (default: 0.08)')
+parser.add_argument('--hf-dataset', default='', type=str,
+                    help='HF repo id (leave empty to use ImageFolder)')
+parser.add_argument('--hf-split', default='train', type=str,
+                    help='Split to load when --hf-dataset is set')
 
 
 def main():
@@ -284,10 +290,29 @@ def main_worker(gpu, ngpus_per_node, args):
         normalize
     ]
 
-    train_dataset = datasets.ImageFolder(
-        traindir,
-        moco.loader.TwoCropsTransform(transforms.Compose(augmentation1), 
-                                      transforms.Compose(augmentation2)))
+    # train_dataset = datasets.ImageFolder(
+    #     traindir,
+    #     moco.loader.TwoCropsTransform(transforms.Compose(augmentation1), 
+    #                                   transforms.Compose(augmentation2)))
+
+    if args.hf_dataset:
+        raw_train = load_dataset(args.hf_dataset, split=args.hf_split)
+        train_dataset = HFTwoCropsDataset(
+            raw_train,
+            moco.loader.TwoCropsTransform(
+                transforms.Compose(augmentation1),
+                transforms.Compose(augmentation2),
+            ),
+        )
+    else:
+        traindir = os.path.join(args.data, 'train')
+        train_dataset = torchvision.datasets.ImageFolder(
+            traindir,
+            moco.loader.TwoCropsTransform(
+                transforms.Compose(augmentation1),
+                transforms.Compose(augmentation2),
+            ),
+        )
 
     if args.distributed:
         train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)

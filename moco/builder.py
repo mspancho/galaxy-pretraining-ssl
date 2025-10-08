@@ -134,4 +134,4 @@ def concat_all_gather(tensor):
     torch.distributed.all_gather(tensors_gather, tensor, async_op=False)
 
     output = torch.cat(tensors_gather, dim=0)
-    return outputß
+    return output

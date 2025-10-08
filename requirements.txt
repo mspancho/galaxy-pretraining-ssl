@@ -1,0 +1,21 @@
+# Core PyTorch stack with CUDA 11.6 support
+torch==1.12.1+cu116
+torchvision==0.13.1+cu116
+timm==0.3.2
+--extra-index-url https://download.pytorch.org/whl/cu116
+
+# Rest of dependencies
+numpy==1.21.6
+pillow>=8.3.0,<10.0.0
+tqdm>=4.62.0
+huggingface-hub>=0.10.0,<1.0.0
+datasets>=2.0.0,<5.0.0
+safetensors>=0.3.0
+pandas>=1.3.0
+pyarrow>=5.0.0
+matplotlib>=3.5.0
+tensorboard>=2.8.0
+pyyaml>=6.0
+packaging>=21.0
+filelock>=3.4.0
+fsspec>=2022.1.0
