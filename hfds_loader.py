@@ -1,4 +1,5 @@
 import datasets
+import torch
 
 class HFTwoCropsDataset(torch.utils.data.Dataset):
     def __init__(self, hf_dataset, two_crops_transform):
