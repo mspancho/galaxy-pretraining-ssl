@@ -1,5 +1,6 @@
 .conda/
 .venv/
 galaxy/
-mae
+mae/
+runs/
 __pycache__/
