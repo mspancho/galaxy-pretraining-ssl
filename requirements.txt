@@ -1,7 +1,7 @@
-# Core PyTorch stack with CUDA 11.6 support
-torch==1.12.1+cu116
+# PyTorch with CUDA 11.6 support
+torch==2.8.0+cu116
 torchvision==0.13.1+cu116
-timm==0.3.2
+timm==0.4.9
 --extra-index-url https://download.pytorch.org/whl/cu116
 
 # Rest of dependencies

@@ -27,6 +27,8 @@ import torch.utils.data.distributed
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import torchvision.models as torchvision_models
+from datasets import load_dataset
+from hfds_loader import HFTwoCropsDataset, HFImageDataset
 
 import vits
 
@@ -72,7 +74,7 @@ parser.add_argument('--world-size', default=-1, type=int,
                     help='number of nodes for distributed training')
 parser.add_argument('--rank', default=-1, type=int,
                     help='node rank for distributed training')
-parser.add_argument('--dist-url', default='tcp://224.66.41.62:23456', type=str,
+parser.add_argument('--dist-url', default='env://', type=str,
                     help='url used to set up distributed training')
 parser.add_argument('--dist-backend', default='nccl', type=str,
                     help='distributed backend')
@@ -85,6 +87,13 @@ parser.add_argument('--multiprocessing-distributed', action='store_true',
                          'N processes per node, which has N GPUs. This is the '
                          'fastest way to use PyTorch for either single node or '
                          'multi node data parallel training')
+parser.add_argument('--hf-dataset', default='', type=str,
+                    help='HF repo id (leave empty to use ImageFolder)')
+parser.add_argument('--hf-train-split', default='train', type=str,
+                    help='HF split for training data')
+parser.add_argument('--hf-val-split', default='test', type=str,
+                    help='HF split for validation data')
+
 
 # additional configs:
 parser.add_argument('--pretrained', default='', type=str,
@@ -267,13 +276,32 @@ def main_worker(gpu, ngpus_per_node, args):
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
 
-    train_dataset = datasets.ImageFolder(
-        traindir,
-        transforms.Compose([
-            transforms.RandomResizedCrop(224),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            normalize,
+    # train_dataset = datasets.ImageFolder(
+    #     traindir,
+    #     transforms.Compose([
+    #         transforms.RandomResizedCrop(224),
+    #         transforms.RandomHorizontalFlip(),
+    #         transforms.ToTensor(),
+    #         normalize,
+    #     ]))
+    train_transform = transforms.Compose([
+        transforms.RandomResizedCrop(224),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        normalize,
+    ])
+    if args.hf_dataset:
+        raw_train = load_dataset(args.hf_dataset, split=args.hf_train_split)
+        train_dataset = HFImageDataset(raw_train, train_transform)
+    else:
+        traindir = os.path.join(args.data, 'train')
+        train_dataset = datasets.ImageFolder(
+            traindir,
+            transforms.Compose([
+                transforms.RandomResizedCrop(224),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                normalize,
         ]))
 
     if args.distributed:
@@ -285,13 +313,20 @@ def main_worker(gpu, ngpus_per_node, args):
         train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
         num_workers=args.workers, pin_memory=True, sampler=train_sampler)
 
+    val_transform = transforms.Compose([
+        transforms.Resize(256),
+        transforms.CenterCrop(224),
+        transforms.ToTensor(),
+        normalize,
+    ])
+    if args.hf_dataset:
+        raw_val = load_dataset(args.hf_dataset, split=args.hf_val_split)
+        val_dataset = HFImageDataset(raw_val, val_transform)
+    else:
+        val_dataset = datasets.ImageFolder(valdir, val_transform)
+
     val_loader = torch.utils.data.DataLoader(
-        datasets.ImageFolder(valdir, transforms.Compose([
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            normalize,
-        ])),
+        val_dataset,
         batch_size=256, shuffle=False,
         num_workers=args.workers, pin_memory=True)
 
@@ -325,6 +360,10 @@ def main_worker(gpu, ngpus_per_node, args):
             }, is_best)
             if epoch == args.start_epoch:
                 sanity_check(model.state_dict(), args.pretrained, linear_keyword)
+    if (not args.multiprocessing_distributed or args.rank == 0):
+        print(f'Best Acc@1: {best_acc1.item() if torch.is_tensor(best_acc1) else best_acc1:.3f}')
+        with open("logs.txt", "a", encoding="utf-8") as log_file:
+            log_file.write(f'Best Acc@1: {best_acc1:.3f}\n')
 
 
 def train(train_loader, model, criterion, optimizer, epoch, args):

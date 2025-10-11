@@ -79,7 +79,7 @@ parser.add_argument('--world-size', default=-1, type=int,
                     help='number of nodes for distributed training')
 parser.add_argument('--rank', default=-1, type=int,
                     help='node rank for distributed training')
-parser.add_argument('--dist-url', default='tcp://224.66.41.62:23456', type=str,
+parser.add_argument('--dist-url', default='env://', type=str,
                     help='url used to set up distributed training')
 parser.add_argument('--dist-backend', default='nccl', type=str,
                     help='distributed backend')
@@ -118,6 +118,8 @@ parser.add_argument('--warmup-epochs', default=10, type=int, metavar='N',
                     help='number of warmup epochs')
 parser.add_argument('--crop-min', default=0.08, type=float,
                     help='minimum scale for random cropping (default: 0.08)')
+parser.add_argument('--rotate', default='n', type=str,
+                    help='Rotation to add to data augmentation')
 parser.add_argument('--hf-dataset', default='', type=str,
                     help='HF repo id (leave empty to use ImageFolder)')
 parser.add_argument('--hf-split', default='train', type=str,
@@ -141,10 +143,11 @@ def main():
         warnings.warn('You have chosen a specific GPU. This will completely '
                       'disable data parallelism.')
 
-    if args.dist_url == "env://" and args.world_size == -1:
-        args.world_size = int(os.environ["WORLD_SIZE"])
+    # Kenichi Maeda help
+    # if args.dist_url == "env://" and args.world_size == -1:
+    args.world_size = int(os.environ["WORLD_SIZE"])
 
-    args.distributed = args.world_size > 1 or args.multiprocessing_distributed
+    args.distributed = True # args.world_size > 1 or args.multiprocessing_distributed
 
     ngpus_per_node = torch.cuda.device_count()
     if args.multiprocessing_distributed:
@@ -290,6 +293,10 @@ def main_worker(gpu, ngpus_per_node, args):
         normalize
     ]
 
+    if args.rotate == 'y':
+        augmentation1.insert(5, transforms.RandomRotation(30))
+        augmentation2.insert(6, transforms.RandomRotation(30))
+
     # train_dataset = datasets.ImageFolder(
     #     traindir,
     #     moco.loader.TwoCropsTransform(transforms.Compose(augmentation1), 
@@ -330,8 +337,8 @@ def main_worker(gpu, ngpus_per_node, args):
         # train for one epoch
         train(train_loader, model, optimizer, scaler, summary_writer, epoch, args)
 
-        if not args.multiprocessing_distributed or (args.multiprocessing_distributed
-                and args.rank == 0): # only the first GPU saves checkpoint
+        if (not args.multiprocessing_distributed or (args.multiprocessing_distributed
+                and args.rank == 0)) and epoch == (args.epochs - 1): # only the first GPU saves checkpoint
             save_checkpoint({
                 'epoch': epoch + 1,
                 'arch': args.arch,

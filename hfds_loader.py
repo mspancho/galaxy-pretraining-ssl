@@ -19,3 +19,23 @@ class HFTwoCropsDataset(torch.utils.data.Dataset):
         views = self.two_crops_transform(img)
         label = sample.get("label", 0)
         return views, label
+
+class HFImageDataset(torch.utils.data.Dataset):
+    def __init__(self, hf_dataset, transform):
+        self.dataset = hf_dataset
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, idx):
+        sample = self.dataset[idx]
+        img = sample["image"]
+        if not hasattr(img, "convert"):
+            if isinstance(img, torch.Tensor):
+                img = (img.permute(1, 2, 0).cpu().numpy() * 255).astype(np.uint8)
+            img = Image.fromarray(np.array(img))
+        if self.transform is not None:
+            img = self.transform(img)
+        label = sample.get("label", 0)
+        return img, label
