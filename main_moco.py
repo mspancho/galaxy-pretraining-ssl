@@ -143,7 +143,7 @@ def main():
         warnings.warn('You have chosen a specific GPU. This will completely '
                       'disable data parallelism.')
 
-    # Kenichi Maeda help
+    # Thank you to Kenichi Maeda for helping me resolve this issue.
     # if args.dist_url == "env://" and args.world_size == -1:
     args.world_size = int(os.environ["WORLD_SIZE"])
 
